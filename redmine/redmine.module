@@ -8,24 +8,23 @@
 // @todo Support multiple redmine servers that are exportable via CTools?
 
 libraries_load('phpactiveresource');
-require_once ('redmine.inc');
 // Load field hooks
 require_once(dirname(__FILE__) . '/redmine.field.inc');
 
 function redmine_libraries_info() {
   $libraries['phpactiveresource'] = array(
     'name' => 'PHP ActiveResource',
-    'vendor url' => 'https://github.com/lux/phpactiveresource',
-    'download url' => 'https://github.com/lux/phpactiveresource',
+    'vendor url' => 'https://github.com/jbroadway/phpactiveresource',
+    'download url' => 'https://github.com/jbroadway/phpactiveresource',
     'version arguments' => array(
-      'file' => 'ActiveResource.php',
+      'file' => 'lib/ActiveResource/ActiveResource.php',
       // Best practice: Document the actual version strings for later reference.
       // 1.x: Version 1.0
       'pattern' => '/@version (\d+\.\d+)/',
       'lines' => 50,
     ),
     'files' => array(
-      'php' => array('ActiveResource.php'),
+      'php' => array('lib/ActiveResource/ActiveResource.php'),
     ),
   );
   return $libraries;
@@ -77,6 +76,34 @@ function redmine_menu() {
 
 function redmine_menu_alter(&$items) {
   $items['admin/config/services/redmine/list']['title'] = 'Servers';
+}
+
+/**
+ * Returns a user's credentials, optionally for a particular server key
+ */
+function redmine_user_credentials($server = '') {
+  global $user;
+  $account = user_load($user->uid);
+  $fields = field_info_field_map();
+  $instances = field_info_instances('user');
+  $configs = array();
+  foreach ($fields as $f => $v) {
+    if (($v['type'] == 'redmine_api_key') && array_key_exists($f, $instances['user'])) {
+      $configs[] = $f;
+    }
+  }
+  $user_config = array();
+  foreach($configs as $fieldname) {
+    if ($instances = field_get_items('user', $account, $fieldname)) {
+      foreach($instances as $config) {
+        $user_config[$config['server']] = $config['value'];
+      }
+    }
+  }
+  if ($server) {
+    return isset($user_config[$server]) ? $user_config[$server] : FALSE;
+  }
+  return $user_config;
 }
 
 /**
@@ -140,19 +167,6 @@ function redmine_get_server_options() {
  */
 function redmine_get_library_path($library) {
   return module_exists('libraries') ? libraries_get_path($library) : 'sites/all/libraries/' . $library;
-}
-
-/**
- * Implements hook_registry_files_alter().
- */
-function redmine_registry_files_alter(&$files, $modules) {
-  $dir = redmine_get_library_path('redmine-php-sdk');
-  foreach (file_scan_directory($dir . '/src', '/\.php$/') as $file) {
-    $files[$file->uri] = array(
-      'module' => 'redmine',
-      'weight' => 0,
-    );
-  }
 }
 
 /**

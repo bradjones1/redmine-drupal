@@ -13,8 +13,6 @@ dependencies[] = ctools
 dependencies[] = libraries
 
 ; Loadable code files
-files[] = DrupalRedmineConnection.php
 files[] = plugins/export_ui/redmine_server_ui.class.php
 files[] = redmine.inc
 files[] = redmine.module
-files[] = redmine.config.inc

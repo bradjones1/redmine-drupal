@@ -1,74 +1,44 @@
 <?php
-require_once ('redmine.config.inc');
 
-class RedmineActiveResource extends ActiveResource {
+class RedmineActiveResource extends \ActiveResource\ActiveResource {
+  /* API key to use. */
+  public $key = '';
+  
   /**
    * Fetch the specified request via drupal_http_request() if cURL is not enabled.
    */
   function _fetch ($url, $method, $params) {
-    if (extension_loaded('curl')) {
-      return parent::_fetch($url, $method, $params);
-    }
-
     $options['headers'] = array();
-
-    if ($this->request_format == 'xml') {
-      $options['headers']['Content-Type'] = 'text/xml';
-      $options['headers']['Length'] = strlen($params);
+    if ($this->key) {
+      $options['headers'][] = 'X-Redmine-API-Key: ' . $this->key;
     }
-    switch ($method) {
-      case 'POST':
-      case 'PUT':
-        $options['method'] = $method;
-        $options['data'] = $params;
-          break;
-      case 'DELETE':
-        $options['method'] = 'DELETE';
-        break;
-      case 'GET':
-      default:
-        break;
-    }
-
-    $request = drupal_http_request($url, $options);
-
-    if (!empty($request->error)) {
-      $this->errno = $request->code;
-      $this->error = $request->error;
-    }
-
-    if ($request->code == 401) {
-      $this->errno = 401;
-//OOPS
-//      $this->error = $
-    }
-
-    $res = new stdClass();
-//OOPS
-//    $res->
-
-      // Check HTTP status code for denied access
-      $http_code = curl_getinfo ($ch, CURLINFO_HTTP_CODE);
-      if ($http_code == 401) {
-          $this->errno = $http_code;
-          $this->error = "HTTP Basic: Access denied.";
-          curl_close ($ch);
-          return false;
-      }
-
-      if (! $res) {
-          $this->errno = curl_errno ($ch);
-          $this->error = curl_error ($ch);
-          curl_close ($ch);
-          return false;
-      }
-      curl_close ($ch);
-      return $res;
+    $this->request_headers = $options['headers'];
+    return parent::_fetch($url, $method, $params);
   }
-  function __construct ($data = array ()) {
+
+  function __construct ($data = array()) {
     parent::__construct($data);
-    $config = new RedmineAPIConfig();
-    $this->site = $config->site();
+    $servers = redmine_server_load_all_enabled();
+    if (!$servers) {
+      throw new Exception(t('No servers configured.'));
+    }
+    $user_servers = redmine_user_credentials();
+    // The above function returns server configs in an ordered array.
+    foreach ($user_servers as $s => $c) {
+      if (isset($servers[$s])) {
+        $this->site = $servers[$s]->url;
+        $this->key = $c;
+        continue;
+      }
+    }
+    // We might just have a global key.
+    if (!$this->site) {
+      $server = reset($servers);
+      $this->site = $server->url;
+      $this->key = $server->global_api_key;
+    }
+    // Give modules the opportunity to alter the config.
+    drupal_alter('redmine_config', $this);
     $this->request_format = 'xml';
   }
 
@@ -98,7 +68,7 @@ class RedmineActiveResource extends ActiveResource {
     if (!isset($this->_data[$section])) {
       return NULL;
     }
-    if (get_class($this->_data[$section]) == 'SimpleXMLElement') {
+    if (is_object($this->_data[$section]) && get_class($this->_data[$section]) == 'SimpleXMLElement') {
       $result = $this->sx_array($this->_data[$section]);
       if ($list_wrapper && isset($result[$list_wrapper]) && $this->isAssoc($result[$list_wrapper])) {
         $result[$list_wrapper] = array($result[$list_wrapper]);

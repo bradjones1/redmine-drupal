@@ -56,8 +56,6 @@ function redmine_field_widget_info() {
     'field types' => array('redmine_api_key'),
     'settings' => array(
       'size' => 42,
-      // @todo Add a setting to allow the user to select which server.
-      // @todo Add setting for the default server.
     ),
   );
 
@@ -113,13 +111,15 @@ function redmine_field_validate($entity_type, $entity, $field, $instance, $langc
     if ($value !== '' && $server = redmine_server_load($item['server'])) {
       if (preg_match('/^[a-f\d]{40}$/', $value)) {
         try {
-          $connection = new DrupalRedmineConnection($server, $value);
-          $data = $connection->getCurrentUser();
-          if (empty($data)) {
-            throw new RedmineException(t('Unable to contact server or invalid API key.'));
+          // Count projects in an attempt to get basic info with this configuration.
+          $counter = new RedmineActiveResource();
+          $counter->key = $value;
+          $counter->site = $server->url;
+          if (!$counter->count_items('projects', array())) {
+            throw new Exception(t('Unable to contact server or invalid API key.'));
           }
         }
-        catch (RedmineException $e) {
+        catch (Exception $e) {
           $errors[$field['field_name']][$langcode][$delta][] = array(
             'error' => 'redmine_api_key_invalid',
             'message' => t('%name: @message.', array('@message' => $e->getMessage(), '%name' => $instance['label'])),
