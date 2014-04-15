@@ -16,8 +16,31 @@ function redmine_field_info() {
     'default_formatter' => 'text_plain',
     'default_token_formatter' => 'text_plain',
   );
-
+  // Support for Entity API's entity metadata wrappers.
+  if (module_exists('entity')) {
+    $info['redmine_api_key']['property_callbacks'] = array('redmine_api_key_field_property_callback');
+    $info['redmine_api_key']['property_type'] = 'struct';
+  }
   return $info;
+}
+
+/**
+ * Callback to provide property information via Entity API.
+ *
+ * @see https://drupal.org/node/1156554
+ */
+function redmine_api_key_field_property_callback(&$info, $entity_type, $field, $instance, $field_type) {
+  $property = &$info[$entity_type]['bundles'][$instance['bundle']]['properties'][$field['field_name']];
+  $property['getter callback'] = 'redmine_api_key_field_getter_callback';
+}
+
+/**
+ * Getter callback for redmine_api_key
+ */
+function redmine_api_key_field_getter_callback($entity, array $options, $name, $entity_type, &$context) {
+  $langcode = isset($options['language']) ? $options['language']->language : LANGUAGE_NONE;
+  $langcode = entity_metadata_field_get_language($entity_type, $entity, $context['field'], $langcode, TRUE);
+  return $entity->{$name}[$langcode];
 }
 
 /**

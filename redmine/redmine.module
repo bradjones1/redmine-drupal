@@ -101,7 +101,7 @@ function redmine_user_credentials($server = '') {
     }
   }
   if ($server) {
-    return isset($user_config[$server]) ? $user_config[$server] : FALSE;
+    return isset($user_config[$server]) ? array($server => $user_config[$server]) : FALSE;
   }
   return $user_config;
 }

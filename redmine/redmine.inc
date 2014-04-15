@@ -16,14 +16,24 @@ class RedmineActiveResource extends \ActiveResource\ActiveResource {
     return parent::_fetch($url, $method, $params);
   }
 
-  function __construct ($data = array()) {
+  /**
+   * Class constructor.
+   *
+   * @param array
+   *   Data array, primarily used to create the ActiveResource
+   *
+   * @param string
+   *   Server machine key to use, either with user credentials or global.
+   */
+  function __construct ($data = array(), $serverid = '') {
     parent::__construct($data);
     $servers = redmine_server_load_all_enabled();
     if (!$servers) {
       throw new Exception(t('No servers configured.'));
     }
-    $user_servers = redmine_user_credentials();
+    $user_servers = redmine_user_credentials($serverid);
     // The above function returns server configs in an ordered array.
+    // Honoring that order, use the first one for which a enabled config is found.
     foreach ($user_servers as $s => $c) {
       if (isset($servers[$s])) {
         $this->site = $servers[$s]->url;
@@ -33,7 +43,10 @@ class RedmineActiveResource extends \ActiveResource\ActiveResource {
     }
     // We might just have a global key.
     if (!$this->site) {
-      $server = reset($servers);
+      if ($serverid && !isset($servers[$serverid])) {
+        throw new Exception(t('Server specified for transaction but no configuration found'));
+      }
+      $server = $serverid ? $servers[$serverid] : reset($servers);
       $this->site = $server->url;
       $this->key = $server->global_api_key;
     }
